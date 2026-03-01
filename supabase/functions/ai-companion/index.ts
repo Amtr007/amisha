@@ -178,8 +178,12 @@ interface GeminiModelConfig {
 const GEMINI_MODELS: GeminiModelConfig[] = [
   { model: "gemini-2.0-flash", apiVersion: "v1beta" },
   { model: "gemini-2.0-flash-lite", apiVersion: "v1beta" },
-  { model: "gemini-1.5-flash", apiVersion: "v1" },
+  { model: "gemini-1.5-flash", apiVersion: "v1beta" },
 ];
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 interface AIResponse {
   should_reply: boolean;
@@ -267,12 +271,17 @@ async function callGemini(
   apiKey: string
 ): Promise<AIResponse> {
   let lastErr = "";
-  for (const config of GEMINI_MODELS) {
+  for (let i = 0; i < GEMINI_MODELS.length; i++) {
+    const config = GEMINI_MODELS[i];
     try {
       return await callGeminiModel(config, systemPrompt, userPrompt, apiKey);
     } catch (e) {
       lastErr = String(e);
       console.error(`[amisha] ${config.model} failed:`, lastErr);
+      // Wait before trying next model to avoid rapid rate limit hits
+      if (i < GEMINI_MODELS.length - 1) {
+        await delay(2000);
+      }
     }
   }
   throw new Error(`All Gemini models failed. Last: ${lastErr}`);
