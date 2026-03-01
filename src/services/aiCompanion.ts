@@ -69,14 +69,15 @@ export type AmishaTrigger =
 // ---- Debounce ----
 
 const lastTriggerTime: Record<string, number> = {};
-const DEBOUNCE_MS = 30_000; // 30 seconds between ANY trigger for same conversation
+const DEBOUNCE_MS = 120_000; // 120 seconds between ANY trigger for same conversation (prevents duplicate replies)
 
 // ---- Trigger Function ----
 
 export function triggerAmisha(
   conversationId: string,
   trigger: AmishaTrigger,
-  userQuery?: string
+  userQuery?: string,
+  onAmishaReplied?: () => void
 ) {
   // INVOCATION bypasses debounce
   if (trigger !== 'INVOCATION') {
@@ -111,6 +112,11 @@ export function triggerAmisha(
       });
       const body = await resp.json().catch(() => ({}));
       console.log(`[amisha] Response: ${resp.status}`, body);
+
+      // If Amisha replied successfully, trigger a message refresh after a short delay
+      if (resp.ok && body.should_reply && onAmishaReplied) {
+        setTimeout(() => onAmishaReplied(), 500);
+      }
     } catch (err) {
       console.error('[amisha] trigger error:', err);
     }
