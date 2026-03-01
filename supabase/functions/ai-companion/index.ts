@@ -353,18 +353,21 @@ Deno.serve(async (req: Request) => {
       .eq("conversation_id", payload.conversationId)
       .is("left_at", null);
 
+    console.log(`[amisha] Conversation ${payload.conversationId}: ${(participants || []).length} participants, trigger: ${payload.trigger}`);
+
     const humanParticipants = (participants || []).filter(
       (p: any) => !p.user?.is_ai_user
     );
 
-    if (humanParticipants.length < 2) {
-      return jsonResponse({ error: "Need 2 human participants" }, 400);
+    if (humanParticipants.length < 1) {
+      return jsonResponse({ error: "No human participants found" }, 400);
     }
 
+    // Support both couple DMs (2 humans) and direct Amisha DMs (1 human)
     const userA = humanParticipants[0].user;
-    const userB = humanParticipants[1].user;
+    const userB = humanParticipants.length >= 2 ? humanParticipants[1].user : null;
     const user1Name = userA.display_name || userA.username || "User 1";
-    const user2Name = userB.display_name || userB.username || "User 2";
+    const user2Name = userB ? (userB.display_name || userB.username || "User 2") : "Partner";
 
     // Get recent messages
     const { data: recentMessages } = await serviceClient
@@ -379,7 +382,7 @@ Deno.serve(async (req: Request) => {
     const msgText = msgs
       .map((m: any) => {
         const name = m.sender_id === userA.id ? user1Name
-          : m.sender_id === userB.id ? user2Name
+          : (userB && m.sender_id === userB.id) ? user2Name
             : "Amisha";
         const content = m.message_type !== "text" ? `[${m.message_type}]` : m.content || "";
         return `[${name}]: ${content}`;

@@ -94,10 +94,14 @@ export function triggerAmisha(
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      if (!session) return;
+      if (!session) {
+        console.warn('[amisha] No session — skipping trigger');
+        return;
+      }
 
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      await fetch(`${supabaseUrl}/functions/v1/ai-companion`, {
+      console.log(`[amisha] Triggering: ${trigger} for conversation ${conversationId}`);
+      const resp = await fetch(`${supabaseUrl}/functions/v1/ai-companion`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${session.access_token}`,
@@ -105,6 +109,8 @@ export function triggerAmisha(
         },
         body: JSON.stringify({ conversationId, trigger, userQuery }),
       });
+      const body = await resp.json().catch(() => ({}));
+      console.log(`[amisha] Response: ${resp.status}`, body);
     } catch (err) {
       console.error('[amisha] trigger error:', err);
     }
