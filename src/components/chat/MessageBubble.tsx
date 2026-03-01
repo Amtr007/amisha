@@ -259,22 +259,177 @@ export function MessageBubble({
 
   if (isAmisha) {
     return (
-      <div className="flex items-start gap-2 px-1 py-1 group mb-1">
+      <div
+        className="flex items-start gap-2 px-1 py-1 group mb-1"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
         <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-teal-400 to-cyan-600 flex items-center justify-center shadow-md text-white text-xs font-bold select-none mt-1">
           A
         </div>
 
-        <div className="flex-1 min-w-0 max-w-[85%]">
+        <div
+          className="relative flex-1 min-w-0 max-w-[85%] transition-transform"
+          style={{ transform: `translateX(${swipeX}px)` }}
+        >
+          {swipeX !== 0 && (
+            <div className="absolute top-1/2 -translate-y-1/2 -right-12 w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center">
+              <Reply size={18} className="text-teal-600" />
+            </div>
+          )}
+
           <div className="flex items-baseline gap-2 mb-1">
             <span className="text-xs font-semibold text-teal-600 dark:text-teal-400">Amisha</span>
             <span className="text-xs text-gray-400 dark:text-gray-500">{formatTime(message.created_at)}</span>
           </div>
 
-          <div className="rounded-2xl rounded-tl-sm px-4 py-3 bg-gradient-to-br from-teal-50 to-cyan-50 dark:from-teal-950/70 dark:to-cyan-950/70 border border-teal-200/70 dark:border-teal-700/40 shadow-sm">
-            <p className="text-sm text-gray-800 dark:text-gray-100 leading-relaxed whitespace-pre-wrap">
-              {message.content}
-            </p>
+          {message.replyTo && !isDeleted && (
+            <div className="text-xs px-3 py-2 mb-1 rounded-lg border-l-2 bg-gray-100 border-gray-400 text-gray-600">
+              <p className="font-medium text-xs">
+                {message.replyTo.sender.display_name || message.replyTo.sender.username}
+              </p>
+              <p className="truncate">
+                {message.replyTo.deleted_for_everyone
+                  ? 'Message deleted'
+                  : message.replyTo.content || `[${message.replyTo.message_type}]`}
+              </p>
+            </div>
+          )}
+
+          <div
+            className="rounded-2xl rounded-tl-sm px-4 py-3 bg-gradient-to-br from-teal-50 to-cyan-50 dark:from-teal-950/70 dark:to-cyan-950/70 border border-teal-200/70 dark:border-teal-700/40 shadow-sm"
+            onMouseDown={handleMouseDown}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseLeave}
+          >
+            {isDeleted ? (
+              <div className="flex items-center gap-2 text-gray-400 italic">
+                <Ban size={14} />
+                <span>This message was deleted</span>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-800 dark:text-gray-100 leading-relaxed whitespace-pre-wrap">
+                {message.content}
+              </p>
+            )}
           </div>
+
+          {/* Reactions summary for Amisha messages */}
+          {Object.keys(groupedReactions).length > 0 && !isDeleted && (
+            <div className="flex flex-wrap gap-1 mt-1 justify-start">
+              {Object.entries(groupedReactions).map(([emoji, reactions]) => (
+                <button
+                  key={emoji}
+                  onClick={() => onReaction(message.id, emoji)}
+                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-full text-xs shadow-sm hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                >
+                  <span>{emoji}</span>
+                  {reactions.length > 1 && (
+                    <span className="text-gray-500 dark:text-gray-400">{reactions.length}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* 3-dot menu button + context menu for Amisha messages */}
+          {!isDeleted && (
+            <>
+              <button
+                onClick={() => setShowMenu(!showMenu)}
+                className="absolute top-0 right-0 translate-x-full pl-1 opacity-0 group-hover:opacity-100 transition-opacity w-7 h-7 rounded-full bg-white dark:bg-gray-700 shadow-md flex items-center justify-center text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-white"
+              >
+                <MoreVertical size={14} />
+              </button>
+
+              {showMenu && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => {
+                      setShowMenu(false);
+                      setShowReactions(false);
+                    }}
+                  />
+                  <div className="fixed z-50 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden w-[180px] left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 sm:absolute sm:left-auto sm:top-auto sm:translate-x-0 sm:translate-y-0 sm:w-[160px] sm:left-full sm:ml-2 sm:top-0">
+                    <button
+                      onClick={() => {
+                        setShowReactions(!showReactions);
+                      }}
+                      className="w-full px-3 py-2.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                    >
+                      <span>React</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        onReply(message);
+                        setShowMenu(false);
+                      }}
+                      className="w-full px-3 py-2.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                    >
+                      <Reply size={14} />
+                      <span>Reply</span>
+                    </button>
+                    {onStar && (
+                      <button
+                        onClick={() => {
+                          onStar(message.id);
+                          setShowMenu(false);
+                        }}
+                        className="w-full px-3 py-2.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                      >
+                        <Star size={14} className={message.isStarred ? 'fill-amber-400 text-amber-400' : ''} />
+                        <span>{message.isStarred ? 'Unstar' : 'Star'}</span>
+                      </button>
+                    )}
+                    <div className="border-t border-gray-100 dark:border-gray-700">
+                      <button
+                        onClick={() => {
+                          onDelete(message.id);
+                          setShowMenu(false);
+                        }}
+                        className="w-full px-3 py-2.5 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                      >
+                        <Trash2 size={14} />
+                        <span>Delete for me</span>
+                      </button>
+                      {onDeleteForEveryone && (
+                        <button
+                          onClick={() => {
+                            onDeleteForEveryone(message.id);
+                            setShowMenu(false);
+                          }}
+                          className="w-full px-3 py-2.5 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
+                        >
+                          <Trash2 size={14} />
+                          <span>Delete for everyone</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {showReactions && (
+                      <div className="border-t border-gray-100 dark:border-gray-700 p-2 flex gap-1 flex-wrap justify-center">
+                        {REACTIONS.map((emoji) => (
+                          <button
+                            key={emoji}
+                            onClick={() => {
+                              onReaction(message.id, emoji);
+                              setShowMenu(false);
+                              setShowReactions(false);
+                            }}
+                            className="w-9 h-9 flex items-center justify-center text-lg hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </>
+          )}
         </div>
       </div>
     );
@@ -303,8 +458,8 @@ export function MessageBubble({
         {message.replyTo && !isDeleted && (
           <div
             className={`text-xs px-3 py-2 mb-1 rounded-lg border-l-2 ${isOwn
-                ? 'bg-teal-700/30 border-teal-300 text-teal-100'
-                : 'bg-gray-100 border-gray-400 text-gray-600'
+              ? 'bg-teal-700/30 border-teal-300 text-teal-100'
+              : 'bg-gray-100 border-gray-400 text-gray-600'
               }`}
           >
             <p className="font-medium text-xs">
@@ -320,8 +475,8 @@ export function MessageBubble({
 
         <div
           className={`px-4 py-2 rounded-2xl ${isOwn
-              ? 'bg-teal-600 dark:bg-teal-700 text-white rounded-br-md'
-              : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-bl-md'
+            ? 'bg-teal-600 dark:bg-teal-700 text-white rounded-br-md'
+            : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-bl-md'
             }`}
           onMouseDown={handleMouseDown}
           onMouseUp={handleMouseUp}

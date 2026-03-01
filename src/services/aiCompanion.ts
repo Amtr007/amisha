@@ -64,7 +64,8 @@ export type AmishaTrigger =
   | 'FIGHT'
   | 'USER_ONLINE'
   | 'MISSING'
-  | 'SOFT_REMINDER';
+  | 'SOFT_REMINDER'
+  | 'REPLY_TO_AI';
 
 // ---- Debounce ----
 
@@ -79,8 +80,8 @@ export function triggerAmisha(
   userQuery?: string,
   onAmishaReplied?: () => void
 ) {
-  // INVOCATION bypasses debounce
-  if (trigger !== 'INVOCATION') {
+  // INVOCATION and REPLY_TO_AI bypass debounce
+  if (trigger !== 'INVOCATION' && trigger !== 'REPLY_TO_AI') {
     const key = conversationId;
     const now = Date.now();
     if (lastTriggerTime[key] && now - lastTriggerTime[key] < DEBOUNCE_MS) {

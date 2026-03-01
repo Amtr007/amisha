@@ -17,7 +17,7 @@ const AMISHA_USER_ID = "00000000-0000-0000-0000-000000000001";
 
 interface TriggerRequest {
   conversationId: string;
-  trigger: "INVOCATION" | "NEW_MESSAGE" | "FIGHT" | "USER_ONLINE" | "MISSING" | "SOFT_REMINDER";
+  trigger: "INVOCATION" | "NEW_MESSAGE" | "FIGHT" | "USER_ONLINE" | "MISSING" | "SOFT_REMINDER" | "REPLY_TO_AI";
   userQuery?: string;
 }
 
@@ -163,6 +163,28 @@ YOUR TASK:
 - Suggest patience or understanding
 - 60-80 words max, 2-4 lines
 - Soft tone, no blame
+
+Respond in STRICT JSON:
+{"should_reply": true, "reply_type": "public", "message": "your response"}`;
+}
+
+function buildReplyToAIPrompt(userReply: string, msgText: string, senderName: string, partnerName: string): string {
+  return `TRIGGER: Reply to Amisha's Message
+${senderName} ne teri previous message ka reply kiya hai.
+
+Unka reply: "${userReply}"
+
+Recent chat context:
+${msgText}
+
+RULES:
+- This is a direct reply to your own message — ALWAYS respond
+- Continue the conversation logically based on context
+- Use ${senderName} and ${partnerName} ke real names
+- 60-80 words max, 2-4 lines
+- Soft, caring, neutral tone in simple Hindi
+- Never take sides, never blame
+- Be natural and conversational, not robotic
 
 Respond in STRICT JSON:
 {"should_reply": true, "reply_type": "public", "message": "your response"}`;
@@ -403,6 +425,14 @@ Deno.serve(async (req: Request) => {
           user.id === userA.id ? user2Name : user1Name
         );
         break;
+      case "REPLY_TO_AI":
+        userPrompt = buildReplyToAIPrompt(
+          payload.userQuery || "",
+          msgText,
+          user.id === userA.id ? user1Name : user2Name,
+          user.id === userA.id ? user2Name : user1Name
+        );
+        break;
       case "FIGHT":
         userPrompt = buildFightPrompt(msgText, user1Name, user2Name);
         break;
@@ -420,11 +450,13 @@ Deno.serve(async (req: Request) => {
     // Call Gemini
     const aiResponse = await callGemini(systemPrompt, userPrompt, geminiKey);
 
-    // INVOCATION always replies
-    if (payload.trigger === "INVOCATION") {
+    // INVOCATION and REPLY_TO_AI always reply
+    if (payload.trigger === "INVOCATION" || payload.trigger === "REPLY_TO_AI") {
       aiResponse.should_reply = true;
       if (!aiResponse.message) {
-        aiResponse.message = "Haan bolo, Amisha yahan hai. Kya help chahiye?";
+        aiResponse.message = payload.trigger === "INVOCATION"
+          ? "Haan bolo, Amisha yahan hai. Kya help chahiye?"
+          : "Haan, batao kya kehna hai? Main sun rahi hoon.";
       }
     }
 

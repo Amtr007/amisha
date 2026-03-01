@@ -412,6 +412,7 @@ export function ChatWindow({ conversation, onBack, onConversationUpdate }: ChatW
       // Fire-and-forget: never block UI for Amisha detection
       const convId = conversation.id;
       const userId = user.id;
+      const repliedToMessage = replyTo;
       (async () => {
         try {
           // Callback to refresh messages when Amisha replies
@@ -436,7 +437,10 @@ export function ChatWindow({ conversation, onBack, onConversationUpdate }: ChatW
             }
           };
 
-          if (detectAmishaInvocation(content)) {
+          // Check if replying to an Amisha message → fire REPLY_TO_AI
+          if (repliedToMessage && isAmishaMessage(repliedToMessage)) {
+            triggerAmisha(convId, 'REPLY_TO_AI', content, onAmishaReplied);
+          } else if (detectAmishaInvocation(content)) {
             triggerAmisha(convId, 'INVOCATION', content, onAmishaReplied);
           }
         } catch (err) {
