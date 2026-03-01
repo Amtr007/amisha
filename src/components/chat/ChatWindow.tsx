@@ -409,33 +409,40 @@ export function ChatWindow({ conversation, onBack, onConversationUpdate }: ChatW
     setReplyTo(null);
 
     if (!conversation.is_group) {
-      const updatedMessages = await getMessages(conversation.id, user.id);
-
-      // Callback to refresh messages when Amisha replies
-      const onAmishaReplied = async () => {
-        const freshMessages = await getMessages(conversation.id, user.id);
-        setMessages((prev) => {
-          const existingIds = new Set(prev.map((m) => m.id));
-          const newMsgs = freshMessages.filter((m) => !existingIds.has(m.id));
-          if (newMsgs.length === 0) return prev;
-          const merged = [...prev, ...newMsgs];
-          previousMessageCountRef.current = merged.length;
-          setTimeout(() => {
-            if (isNearBottom() && !isUserScrollingRef.current) {
-              scrollToBottom('smooth');
+      // Fire-and-forget: never block UI for Amisha detection
+      const convId = conversation.id;
+      const userId = user.id;
+      (async () => {
+        try {
+          // Callback to refresh messages when Amisha replies
+          const onAmishaReplied = async () => {
+            try {
+              const freshMessages = await getMessages(convId, userId);
+              setMessages((prev) => {
+                const existingIds = new Set(prev.map((m) => m.id));
+                const newMsgs = freshMessages.filter((m) => !existingIds.has(m.id));
+                if (newMsgs.length === 0) return prev;
+                const merged = [...prev, ...newMsgs];
+                previousMessageCountRef.current = merged.length;
+                setTimeout(() => {
+                  if (isNearBottom() && !isUserScrollingRef.current) {
+                    scrollToBottom('smooth');
+                  }
+                }, 50);
+                return merged;
+              });
+            } catch (err) {
+              console.error('[amisha] refresh error:', err);
             }
-          }, 50);
-          return merged;
-        });
-      };
+          };
 
-      if (detectAmishaInvocation(content)) {
-        triggerAmisha(conversation.id, 'INVOCATION', content, onAmishaReplied);
-      } else if (detectFight(updatedMessages)) {
-        triggerAmisha(conversation.id, 'FIGHT', undefined, onAmishaReplied);
-      } else if (detectMissing(updatedMessages)) {
-        triggerAmisha(conversation.id, 'MISSING', undefined, onAmishaReplied);
-      }
+          if (detectAmishaInvocation(content)) {
+            triggerAmisha(convId, 'INVOCATION', content, onAmishaReplied);
+          }
+        } catch (err) {
+          console.error('[amisha] detection error:', err);
+        }
+      })();
     }
   };
 
