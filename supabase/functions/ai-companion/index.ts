@@ -176,9 +176,10 @@ interface GeminiModelConfig {
 }
 
 const GEMINI_MODELS: GeminiModelConfig[] = [
+  { model: "gemini-2.5-flash", apiVersion: "v1beta" },
   { model: "gemini-2.0-flash", apiVersion: "v1beta" },
+  { model: "gemini-2.5-flash-lite", apiVersion: "v1beta" },
   { model: "gemini-2.0-flash-lite", apiVersion: "v1beta" },
-  { model: "gemini-1.5-flash", apiVersion: "v1beta" },
 ];
 
 function delay(ms: number): Promise<void> {
@@ -280,7 +281,7 @@ async function callGemini(
       console.error(`[amisha] ${config.model} failed:`, lastErr);
       // Wait before trying next model to avoid rapid rate limit hits
       if (i < GEMINI_MODELS.length - 1) {
-        await delay(2000);
+        await delay(5000);
       }
     }
   }
