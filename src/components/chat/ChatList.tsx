@@ -47,10 +47,10 @@ export function ChatList({ selectedConversationId, onSelectConversation }: ChatL
 
     const channel = subscribeToConversations(user.id, () => {
       if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current);
-      realtimeDebounceRef.current = window.setTimeout(loadConversations, 500);
+      realtimeDebounceRef.current = window.setTimeout(loadConversations, 2000);
     });
 
-    const intervalId = setInterval(loadConversations, 15000);
+    const intervalId = setInterval(loadConversations, 60000);
 
     return () => {
       channel.unsubscribe();
@@ -101,7 +101,6 @@ export function ChatList({ selectedConversationId, onSelectConversation }: ChatL
       if (photoFile) {
         await uploadGroupPhoto(conversationId, photoFile);
       }
-      await loadConversations();
       const newConvs = await getConversations(user?.id || '');
       const newConv = newConvs.find((c) => c.id === conversationId);
       if (newConv) {
@@ -189,11 +188,10 @@ export function ChatList({ selectedConversationId, onSelectConversation }: ChatL
             </button>
             <button
               onClick={() => setShowNewChat(!showNewChat)}
-              className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
-                showNewChat
+              className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${showNewChat
                   ? 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
                   : 'bg-teal-50 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400 hover:bg-teal-100 dark:hover:bg-teal-900/50'
-              }`}
+                }`}
             >
               {showNewChat ? <X size={20} /> : <UserPlus size={18} />}
             </button>
@@ -272,11 +270,10 @@ export function ChatList({ selectedConversationId, onSelectConversation }: ChatL
                 <button
                   key={conv.id}
                   onClick={() => onSelectConversation(conv)}
-                  className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors text-left ${
-                    selectedConversationId === conv.id
+                  className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors text-left ${selectedConversationId === conv.id
                       ? 'bg-teal-50 dark:bg-teal-900/30'
                       : 'hover:bg-gray-50 dark:hover:bg-gray-800'
-                  }`}
+                    }`}
                 >
                   {conv.is_group ? (
                     <div className="relative flex-shrink-0">
