@@ -31,9 +31,14 @@ export function ChatList({ selectedConversationId, onSelectConversation }: ChatL
 
   const loadConversations = useCallback(async () => {
     if (!user?.id) return;
-    const convs = await getConversations(user.id);
-    setConversations(convs);
-    setIsLoading(false);
+    try {
+      const convs = await getConversations(user.id);
+      setConversations(convs);
+    } catch (err) {
+      console.error('[chat] Failed to load conversations:', err);
+    } finally {
+      setIsLoading(false);
+    }
   }, [user?.id]);
 
   useEffect(() => {
@@ -189,8 +194,8 @@ export function ChatList({ selectedConversationId, onSelectConversation }: ChatL
             <button
               onClick={() => setShowNewChat(!showNewChat)}
               className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${showNewChat
-                  ? 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
-                  : 'bg-teal-50 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400 hover:bg-teal-100 dark:hover:bg-teal-900/50'
+                ? 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                : 'bg-teal-50 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400 hover:bg-teal-100 dark:hover:bg-teal-900/50'
                 }`}
             >
               {showNewChat ? <X size={20} /> : <UserPlus size={18} />}
@@ -271,8 +276,8 @@ export function ChatList({ selectedConversationId, onSelectConversation }: ChatL
                   key={conv.id}
                   onClick={() => onSelectConversation(conv)}
                   className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors text-left ${selectedConversationId === conv.id
-                      ? 'bg-teal-50 dark:bg-teal-900/30'
-                      : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                    ? 'bg-teal-50 dark:bg-teal-900/30'
+                    : 'hover:bg-gray-50 dark:hover:bg-gray-800'
                     }`}
                 >
                   {conv.is_group ? (

@@ -54,14 +54,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+
+    // Timeout: don't hang forever if Supabase is slow
+    const timeout = setTimeout(() => {
+      if (!cancelled) {
+        console.warn('[auth] Session check timed out after 10s');
+        setIsLoading(false);
+      }
+    }, 10000);
+
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      if (cancelled) return;
+      clearTimeout(timeout);
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
 
       if (currentSession?.user) {
-        fetchProfile(currentSession.user.id);
+        // Non-blocking: don't wait for profile to finish loading
+        fetchProfile(currentSession.user.id).catch(console.error);
       }
 
+      setIsLoading(false);
+    }).catch((err) => {
+      if (cancelled) return;
+      clearTimeout(timeout);
+      console.error('[auth] Session check failed:', err);
       setIsLoading(false);
     });
 
@@ -70,9 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(newSession?.user ?? null);
 
       if (newSession?.user) {
-        (async () => {
-          await fetchProfile(newSession.user.id);
-        })();
+        fetchProfile(newSession.user.id).catch(console.error);
       } else {
         setProfile(null);
       }
@@ -80,7 +96,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
   }, [fetchProfile]);
 
   const value: AuthContextType = {

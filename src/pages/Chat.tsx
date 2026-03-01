@@ -40,8 +40,9 @@ export function Chat() {
   }, []);
 
   useEffect(() => {
-    const updateLastSeen = async () => {
-      await supabase.rpc('update_last_seen');
+    const updateLastSeen = () => {
+      // Fire-and-forget, never block page load
+      try { supabase.rpc('update_last_seen'); } catch { }
     };
 
     updateLastSeen();
