@@ -12,7 +12,6 @@ import {
   Users,
   X,
   Bell,
-  Brain,
 } from 'lucide-react';
 import type { ConversationWithDetails } from '../../types/database';
 
@@ -28,8 +27,6 @@ interface ChatMenuProps {
   onLeaveGroup?: () => void;
   onOpenGroupInfo?: () => void;
   onAddMembers?: () => void;
-  aiCompanionEnabled?: boolean;
-  onToggleAICompanion?: (enabled: boolean) => void;
 }
 
 export function ChatMenu({
@@ -44,8 +41,6 @@ export function ChatMenu({
   onLeaveGroup,
   onOpenGroupInfo,
   onAddMembers,
-  aiCompanionEnabled,
-  onToggleAICompanion,
 }: ChatMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -116,24 +111,6 @@ export function ChatMenu({
                 <Bell size={18} />
                 <span>Notification Settings</span>
               </button>
-
-              {!conversation.is_group && onToggleAICompanion && (
-                <button
-                  onClick={() => {
-                    onToggleAICompanion(!aiCompanionEnabled);
-                    setIsOpen(false);
-                  }}
-                  className="w-full px-4 py-2.5 flex items-center gap-3 text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  <Brain size={18} className={aiCompanionEnabled ? 'text-teal-600' : 'text-gray-400'} />
-                  <span>
-                    AI Companion{' '}
-                    <span className={`text-xs font-medium ml-1 ${aiCompanionEnabled ? 'text-teal-600' : 'text-gray-400'}`}>
-                      {aiCompanionEnabled ? 'On' : 'Off'}
-                    </span>
-                  </span>
-                </button>
-              )}
             </div>
 
             {isGroup && (
@@ -301,11 +278,10 @@ function ConfirmDialog({
           </button>
           <button
             onClick={onConfirm}
-            className={`px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors ${
-              variant === 'danger'
+            className={`px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors ${variant === 'danger'
                 ? 'bg-red-600 hover:bg-red-700'
                 : 'bg-teal-600 hover:bg-teal-700'
-            }`}
+              }`}
           >
             {confirmText}
           </button>

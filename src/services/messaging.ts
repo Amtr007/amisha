@@ -15,7 +15,7 @@ import type {
 } from '../types/database';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
-const AMISHA_USER_ID = '00000000-0000-0000-0000-000000000001';
+
 
 export async function searchUsers(query: string, currentUserId: string): Promise<User[]> {
   if (!query.trim()) return [];
@@ -24,7 +24,7 @@ export async function searchUsers(query: string, currentUserId: string): Promise
     .from('users')
     .select('*')
     .neq('id', currentUserId)
-    .neq('id', AMISHA_USER_ID)
+    .eq('is_ai_user', false)
     .or(`username.ilike.%${query}%,display_name.ilike.%${query}%`)
     .limit(20);
 
@@ -41,7 +41,7 @@ export async function getAllUsers(currentUserId: string): Promise<User[]> {
     .from('users')
     .select('*')
     .neq('id', currentUserId)
-    .neq('id', AMISHA_USER_ID)
+    .eq('is_ai_user', false)
     .order('display_name');
 
   if (error) {
@@ -172,7 +172,7 @@ export async function getConversations(userId: string): Promise<ConversationWith
     };
 
     const participants = (allParticipants || []).filter((p) => p.conversation_id === convId);
-    const otherParticipant = participants.find((p) => p.user_id !== userId && p.user_id !== AMISHA_USER_ID);
+    const otherParticipant = participants.find((p) => p.user_id !== userId && !(p.user as any)?.is_ai_user);
 
     if (!conv.is_group && !otherParticipant) continue;
 

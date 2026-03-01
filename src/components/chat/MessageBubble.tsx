@@ -10,19 +10,11 @@ import {
   Star,
   Ban,
   Edit,
-  Sparkles,
-  Heart,
-  Smile,
-  Brain,
-  Lock,
-  ChevronDown,
-  ChevronUp,
 } from 'lucide-react';
 import type { MessageWithDetails, MessageReaction } from '../../types/database';
 import { useAuth } from '../../contexts/AuthContext';
 import { VoicePlayer } from './VoicePlayer';
-import { AMISHA_USER_ID, getAmishaMetadata } from '../../services/aiCompanion';
-import type { AmishaMetadata } from '../../services/aiCompanion';
+import { isAmishaMessage } from '../../services/aiCompanion';
 
 interface MessageBubbleProps {
   message: MessageWithDetails;
@@ -32,37 +24,9 @@ interface MessageBubbleProps {
   onReply: (message: MessageWithDetails) => void;
   onStar?: (messageId: string) => void;
   onEdit?: (messageId: string, currentContent: string) => void;
-  onUseSuggestion?: (text: string) => void;
 }
 
 const REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
-
-const SUGGESTION_COLORS = {
-  teal: 'border-teal-200 dark:border-teal-700 text-teal-700 dark:text-teal-300 hover:bg-teal-50 dark:hover:bg-teal-900/40',
-  rose: 'border-rose-200 dark:border-rose-700 text-rose-700 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-900/40',
-  amber: 'border-amber-200 dark:border-amber-700 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/40',
-};
-
-function SuggestionBtn({ icon, label, text, color, onClick }: {
-  icon: React.ReactNode;
-  label: string;
-  text: string;
-  color: 'teal' | 'rose' | 'amber';
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`w-full text-left px-3 py-2 rounded-xl border text-xs transition-colors ${SUGGESTION_COLORS[color]}`}
-    >
-      <div className="flex items-center gap-1.5 mb-0.5 font-semibold">
-        {icon}
-        {label}
-      </div>
-      <p className="opacity-80 leading-snug">{text}</p>
-    </button>
-  );
-}
 
 export function MessageBubble({
   message,
@@ -72,22 +36,18 @@ export function MessageBubble({
   onReply,
   onStar,
   onEdit,
-  onUseSuggestion,
 }: MessageBubbleProps) {
   const { user } = useAuth();
   const [showMenu, setShowMenu] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [swipeX, setSwipeX] = useState(0);
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const hasSwipedRef = useRef(false);
   const longPressTimerRef = useRef<number | null>(null);
   const isLongPressRef = useRef(false);
 
-  const isAmisha = message.sender_id === AMISHA_USER_ID;
-  const amishaMetadata: AmishaMetadata | null = isAmisha ? getAmishaMetadata(message) : null;
-  const isPrivateAmisha = isAmisha && amishaMetadata?.private_for === user?.id;
+  const isAmisha = isAmishaMessage(message);
 
   const isOwn = message.sender_id === user?.id;
   const isDeleted = message.deleted_for_everyone;
@@ -273,13 +233,11 @@ export function MessageBubble({
             href={message.media_url || '#'}
             target="_blank"
             rel="noopener noreferrer"
-            className={`flex items-center gap-3 p-3 rounded-lg ${
-              isOwn ? 'bg-teal-700/30' : 'bg-gray-100'
-            }`}
+            className={`flex items-center gap-3 p-3 rounded-lg ${isOwn ? 'bg-teal-700/30' : 'bg-gray-100'
+              }`}
           >
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-              isOwn ? 'bg-white/20' : 'bg-white'
-            }`}>
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isOwn ? 'bg-white/20' : 'bg-white'
+              }`}>
               <FileText size={20} className={isOwn ? 'text-white' : 'text-gray-600'} />
             </div>
             <div className="flex-1 min-w-0">
@@ -300,9 +258,6 @@ export function MessageBubble({
   };
 
   if (isAmisha) {
-    const suggestions = amishaMetadata?.reply_suggestions;
-    const hasSuggestions = suggestions?.mature || suggestions?.romantic || suggestions?.light_funny;
-
     return (
       <div className="flex items-start gap-2 px-1 py-1 group mb-1">
         <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-teal-400 to-cyan-600 flex items-center justify-center shadow-md text-white text-xs font-bold select-none mt-1">
@@ -312,12 +267,6 @@ export function MessageBubble({
         <div className="flex-1 min-w-0 max-w-[85%]">
           <div className="flex items-baseline gap-2 mb-1">
             <span className="text-xs font-semibold text-teal-600 dark:text-teal-400">Amisha</span>
-            {isPrivateAmisha && (
-              <span className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500">
-                <Lock className="w-2.5 h-2.5" />
-                sirf tumhare liye
-              </span>
-            )}
             <span className="text-xs text-gray-400 dark:text-gray-500">{formatTime(message.created_at)}</span>
           </div>
 
@@ -325,57 +274,6 @@ export function MessageBubble({
             <p className="text-sm text-gray-800 dark:text-gray-100 leading-relaxed whitespace-pre-wrap">
               {message.content}
             </p>
-
-            {amishaMetadata?.emotion_analysis && (
-              <p className="mt-2 text-xs text-teal-600 dark:text-teal-400 italic opacity-75 border-t border-teal-200/50 dark:border-teal-700/30 pt-2">
-                {amishaMetadata.emotion_analysis}
-              </p>
-            )}
-
-            {hasSuggestions && onUseSuggestion && (
-              <div className="mt-3 border-t border-teal-200/50 dark:border-teal-700/30 pt-2">
-                <button
-                  onClick={() => setShowSuggestions((v) => !v)}
-                  className="flex items-center gap-1.5 text-xs font-medium text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 transition-colors"
-                >
-                  <Sparkles size={12} />
-                  {showSuggestions ? 'Suggestions chhupao' : 'Reply suggestions dekho'}
-                  {showSuggestions ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-                </button>
-
-                {showSuggestions && (
-                  <div className="mt-2 space-y-1.5">
-                    {suggestions?.mature && (
-                      <SuggestionBtn
-                        icon={<Brain size={11} />}
-                        label="Mature"
-                        text={suggestions.mature}
-                        color="teal"
-                        onClick={() => onUseSuggestion(suggestions.mature)}
-                      />
-                    )}
-                    {suggestions?.romantic && (
-                      <SuggestionBtn
-                        icon={<Heart size={11} />}
-                        label="Dil se"
-                        text={suggestions.romantic}
-                        color="rose"
-                        onClick={() => onUseSuggestion(suggestions.romantic)}
-                      />
-                    )}
-                    {suggestions?.light_funny && (
-                      <SuggestionBtn
-                        icon={<Smile size={11} />}
-                        label="Thoda halka"
-                        text={suggestions.light_funny}
-                        color="amber"
-                        onClick={() => onUseSuggestion(suggestions.light_funny)}
-                      />
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -395,9 +293,8 @@ export function MessageBubble({
       >
         {swipeX !== 0 && (
           <div
-            className={`absolute top-1/2 -translate-y-1/2 ${
-              isOwn ? '-left-12' : '-right-12'
-            } w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center`}
+            className={`absolute top-1/2 -translate-y-1/2 ${isOwn ? '-left-12' : '-right-12'
+              } w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center`}
           >
             <Reply size={18} className="text-teal-600" />
           </div>
@@ -405,11 +302,10 @@ export function MessageBubble({
 
         {message.replyTo && !isDeleted && (
           <div
-            className={`text-xs px-3 py-2 mb-1 rounded-lg border-l-2 ${
-              isOwn
+            className={`text-xs px-3 py-2 mb-1 rounded-lg border-l-2 ${isOwn
                 ? 'bg-teal-700/30 border-teal-300 text-teal-100'
                 : 'bg-gray-100 border-gray-400 text-gray-600'
-            }`}
+              }`}
           >
             <p className="font-medium text-xs">
               {message.replyTo.sender.display_name || message.replyTo.sender.username}
@@ -423,11 +319,10 @@ export function MessageBubble({
         )}
 
         <div
-          className={`px-4 py-2 rounded-2xl ${
-            isOwn
+          className={`px-4 py-2 rounded-2xl ${isOwn
               ? 'bg-teal-600 dark:bg-teal-700 text-white rounded-br-md'
               : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-bl-md'
-          }`}
+            }`}
           onMouseDown={handleMouseDown}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseLeave}

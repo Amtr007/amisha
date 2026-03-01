@@ -37,14 +37,11 @@ import {
 } from '../../services/messaging';
 import { getUserProfile } from '../../services/auth';
 import {
-  AMISHA_USER_ID,
-  triggerAICompanion,
-  getAICompanionSettings,
-  setAICompanionEnabled,
-  detectEmotionInMessages,
-  detectFightPattern,
+  triggerAmisha,
   detectAmishaInvocation,
-  buildMessagePayloads,
+  detectFight,
+  detectMissing,
+  isAmishaMessage,
 } from '../../services/aiCompanion';
 
 interface ChatWindowProps {
@@ -74,12 +71,6 @@ export function ChatWindow({ conversation, onBack, onConversationUpdate }: ChatW
 
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const [isLoadingOlder, setIsLoadingOlder] = useState(false);
-
-  const [aiEnabled, setAiEnabled] = useState(true);
-  const [aiSuggestionText, setAiSuggestionText] = useState('');
-  const lastAITriggerRef = useRef<number>(0);
-  const otherUserWasOfflineRef = useRef<boolean>(false);
-  const AI_COOLDOWN_MS = 2 * 60 * 1000;
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -233,13 +224,11 @@ export function ChatWindow({ conversation, onBack, onConversationUpdate }: ChatW
           if (
             !conversation.is_group &&
             fullMessage.sender_id !== userId &&
-            fullMessage.sender_id !== AMISHA_USER_ID &&
+            !isAmishaMessage(fullMessage) &&
             fullMessage.content &&
             detectAmishaInvocation(fullMessage.content)
           ) {
-            getMessages(conversationId, userId).then((allMsgs) => {
-              maybeRunAICompanion(allMsgs, 'amisha_invoked', null, undefined, fullMessage.sender_id, fullMessage.content);
-            });
+            triggerAmisha(conversationId, 'INVOCATION', fullMessage.content);
           }
 
           setTimeout(() => {
@@ -267,16 +256,16 @@ export function ChatWindow({ conversation, onBack, onConversationUpdate }: ChatW
           prevMessages.map((m) =>
             m.id === updatedMessage.id
               ? {
-                  ...m,
-                  status: updatedMessage.status,
-                  content: updatedMessage.content,
-                  edited_at: updatedMessage.edited_at,
-                  original_content: updatedMessage.original_content,
-                  deleted_for: updatedMessage.deleted_for,
-                  deleted_for_everyone: updatedMessage.deleted_for_everyone,
-                  is_deleted: updatedMessage.is_deleted,
-                  updated_at: updatedMessage.updated_at,
-                }
+                ...m,
+                status: updatedMessage.status,
+                content: updatedMessage.content,
+                edited_at: updatedMessage.edited_at,
+                original_content: updatedMessage.original_content,
+                deleted_for: updatedMessage.deleted_for,
+                deleted_for_everyone: updatedMessage.deleted_for_everyone,
+                is_deleted: updatedMessage.is_deleted,
+                updated_at: updatedMessage.updated_at,
+              }
               : m
           )
         );
@@ -385,91 +374,7 @@ export function ChatWindow({ conversation, onBack, onConversationUpdate }: ChatW
     return u?.display_name || u?.username || 'User';
   }, []);
 
-  const maybeRunAICompanion = useCallback(
-    async (
-      msgs: MessageWithDetails[],
-      triggerType: 'new_message' | 'fight_detected' | 'unread_delay' | 'user_online' | 'amisha_invoked',
-      targetUserId?: string | null,
-      unreadWaitMinutes?: number,
-      invokingUserId?: string | null,
-      invocationQuestion?: string | null
-    ) => {
-      if (!user?.id) return;
-      if (conversation.is_group) return;
-      if (triggerType !== 'amisha_invoked' && !aiEnabled) return;
 
-      const now = Date.now();
-      if (triggerType !== 'amisha_invoked' && now - lastAITriggerRef.current < AI_COOLDOWN_MS) return;
-      if (msgs.length < 1) return;
-
-      const otherUser = getOtherUser();
-      if (!otherUser) return;
-
-      lastAITriggerRef.current = now;
-
-      const userAProfile = await getUserProfile(user.id);
-      const userA = { id: user.id, name: getUserDisplayName(userAProfile) };
-      const userB = { id: otherUser.id, name: getUserDisplayName(otherUser) };
-
-      await triggerAICompanion({
-        conversation_id: conversation.id,
-        trigger_type: triggerType,
-        user_a: userA,
-        user_b: userB,
-        messages: buildMessagePayloads(msgs, userA, userB),
-        target_user_id: targetUserId ?? null,
-        unread_wait_minutes: unreadWaitMinutes,
-        invoking_user_id: invokingUserId ?? null,
-        invocation_question: invocationQuestion ?? null,
-      });
-    },
-    [user?.id, aiEnabled, conversation.is_group, conversation.id, getOtherUser, getUserDisplayName, AI_COOLDOWN_MS]
-  );
-
-  useEffect(() => {
-    if (!user?.id || conversation.is_group) return;
-
-    getAICompanionSettings(conversation.id, user.id).then((settings) => {
-      if (settings) setAiEnabled(settings.is_enabled);
-    });
-  }, [conversation.id, user?.id, conversation.is_group]);
-
-  useEffect(() => {
-    if (!user?.id || conversation.is_group) return;
-    const otherUser = getOtherUser();
-    if (!otherUser) return;
-
-    const prevOnline = isOnline(otherUser.last_seen);
-    otherUserWasOfflineRef.current = !prevOnline;
-  }, [conversation.id, user?.id, conversation.is_group, getOtherUser]);
-
-  useEffect(() => {
-    if (!user?.id || conversation.is_group) return;
-    const otherUser = getOtherUser();
-    if (!otherUser) return;
-
-    const nowOnline = isOnline(otherUser.last_seen);
-    if (nowOnline && otherUserWasOfflineRef.current) {
-      otherUserWasOfflineRef.current = false;
-      const unreadMessages = messages.filter(
-        (m) => m.sender_id === user.id && m.status !== 'read'
-      );
-      if (unreadMessages.length >= 2) {
-        const waitMinutes = Math.round(
-          (Date.now() - new Date(unreadMessages[0].created_at).getTime()) / 60000
-        );
-        maybeRunAICompanion(messages, 'user_online', otherUser.id, waitMinutes);
-      }
-    } else if (!nowOnline) {
-      otherUserWasOfflineRef.current = true;
-    }
-  }, [currentConversation.otherUser?.last_seen, user?.id, conversation.is_group, getOtherUser, messages, maybeRunAICompanion]);
-
-  const handleToggleAICompanion = useCallback(async (enabled: boolean) => {
-    if (!user?.id) return;
-    setAiEnabled(enabled);
-    await setAICompanionEnabled(conversation.id, user.id, enabled);
-  }, [user?.id, conversation.id]);
 
   const addMessageToState = useCallback(async (messageId: string) => {
     if (!user?.id) return;
@@ -506,20 +411,12 @@ export function ChatWindow({ conversation, onBack, onConversationUpdate }: ChatW
     if (!conversation.is_group) {
       const updatedMessages = await getMessages(conversation.id, user.id);
 
-      const replyToName = replyTo?.sender?.display_name || replyTo?.sender?.username || null;
-      if (detectAmishaInvocation(content, replyToName)) {
-        maybeRunAICompanion(updatedMessages, 'amisha_invoked', null, undefined, user.id, content);
-      } else if (aiEnabled) {
-        const isFight = detectFightPattern(updatedMessages);
-        const hasEmotion = detectEmotionInMessages(updatedMessages);
-
-        if (isFight) {
-          maybeRunAICompanion(updatedMessages, 'fight_detected');
-        } else if (hasEmotion) {
-          maybeRunAICompanion(updatedMessages, 'new_message');
-        } else if (updatedMessages.length % 10 === 0) {
-          maybeRunAICompanion(updatedMessages, 'new_message');
-        }
+      if (detectAmishaInvocation(content)) {
+        triggerAmisha(conversation.id, 'INVOCATION', content);
+      } else if (detectFight(updatedMessages)) {
+        triggerAmisha(conversation.id, 'FIGHT');
+      } else if (detectMissing(updatedMessages)) {
+        triggerAmisha(conversation.id, 'MISSING');
       }
     }
   };
@@ -831,8 +728,6 @@ export function ChatWindow({ conversation, onBack, onConversationUpdate }: ChatW
             onDeleteChat={handleDeleteChat}
             onLeaveGroup={conversation.is_group ? handleLeaveGroup : undefined}
             onOpenGroupInfo={conversation.is_group ? () => setShowGroupInfo(true) : undefined}
-            aiCompanionEnabled={aiEnabled}
-            onToggleAICompanion={handleToggleAICompanion}
           />
         </div>
       </div>
@@ -907,7 +802,6 @@ export function ChatWindow({ conversation, onBack, onConversationUpdate }: ChatW
                       onReply={setReplyTo}
                       onStar={handleStar}
                       onEdit={handleEdit}
-                      onUseSuggestion={(text) => setAiSuggestionText(text)}
                     />
                   </div>
                 ))}
@@ -929,8 +823,6 @@ export function ChatWindow({ conversation, onBack, onConversationUpdate }: ChatW
         onSaveEdit={handleSaveEdit}
         onCancelEdit={handleCancelEdit}
         disabled={isLoading}
-        prefillText={aiSuggestionText}
-        onPrefillConsumed={() => setAiSuggestionText('')}
       />
 
       <MediaGallery
@@ -983,8 +875,8 @@ export function ChatWindow({ conversation, onBack, onConversationUpdate }: ChatW
             conversation.is_group
               ? conversation.group_name || 'Group Chat'
               : conversation.otherUser?.display_name ||
-                conversation.otherUser?.username ||
-                'Chat'
+              conversation.otherUser?.username ||
+              'Chat'
           }
           onClose={() => setShowNotificationSettings(false)}
         />
