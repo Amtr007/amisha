@@ -59,10 +59,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Timeout: don't hang forever if Supabase is slow
     const timeout = setTimeout(() => {
       if (!cancelled) {
-        console.warn('[auth] Session check timed out after 10s');
+        console.warn('[auth] Session check timed out after 5s');
         setIsLoading(false);
       }
-    }, 10000);
+    }, 5000);
 
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       if (cancelled) return;
