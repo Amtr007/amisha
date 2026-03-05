@@ -114,7 +114,7 @@ export async function getConversations(userId: string): Promise<ConversationWith
 
   if (conversationIds.length === 0) return [];
 
-  const [participantsResult, lastMessagesResult, unreadResults] = await Promise.all([
+  const [participantsResult, lastMessagesResult] = await Promise.all([
     supabase
       .from('conversation_participants')
       .select(`
@@ -124,14 +124,6 @@ export async function getConversations(userId: string): Promise<ConversationWith
       .in('conversation_id', conversationIds)
       .is('left_at', null),
     supabase.rpc('get_last_messages_for_conversations', { conv_ids: conversationIds }),
-    Promise.all(
-      conversationIds.map((convId) =>
-        supabase.rpc('get_unread_count', { conv_id: convId }).then(({ data }) => ({
-          convId,
-          count: data || 0,
-        }))
-      )
-    ),
   ]);
 
   if (participantsResult.error) {
@@ -140,7 +132,9 @@ export async function getConversations(userId: string): Promise<ConversationWith
   }
 
   const allParticipants = participantsResult.data;
-  const unreadMap = new Map(unreadResults.map((r) => [r.convId, r.count]));
+  // Skip N+1 unread count queries for instant load — default to 0
+  const unreadMap = new Map<string, number>();
+
 
   const lastMessageMap = new Map<string, ConversationWithDetails['lastMessage']>();
   if (lastMessagesResult.data) {
