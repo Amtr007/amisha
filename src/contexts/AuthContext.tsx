@@ -1,262 +1,144 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from 'react';
-
 import { supabase } from '../lib/supabase';
-
 import type { User as AuthUser, Session } from '@supabase/supabase-js';
-
 import type { User } from '../types/database';
-
 import { getUserProfile } from '../services/auth';
 
-
-
 interface AuthContextType {
-
   user: AuthUser | null;
-
   profile: User | null;
-
   session: Session | null;
-
   isLoading: boolean;
-
   isAuthenticated: boolean;
-
+  sessionReady: boolean;
   refreshProfile: () => Promise<void>;
-
   signOut: () => Promise<{ error: Error | null }>;
-
 }
-
-
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-
-
 function getCachedSession(): { user: AuthUser; session: Session } | null {
-
   try {
-
     for (let i = 0; i < localStorage.length; i++) {
-
       const key = localStorage.key(i);
-
       if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
-
         const raw = localStorage.getItem(key);
-
         if (raw) {
-
           const parsed = JSON.parse(raw);
-
           if (parsed?.user && parsed?.access_token) {
-
             return { user: parsed.user as AuthUser, session: parsed as Session };
-
           }
-
         }
-
       }
-
     }
-
   } catch { }
-
   return null;
-
 }
 
-
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-
   const cached = useRef(getCachedSession());
-
   const [user, setUser] = useState<AuthUser | null>(cached.current?.user ?? null);
-
   const [profile, setProfile] = useState<User | null>(null);
-
   const [session, setSession] = useState<Session | null>(cached.current?.session ?? null);
-
   const [isLoading, setIsLoading] = useState(!cached.current);
-
-
+  // sessionReady = token has been verified/refreshed by Supabase
+  // Components should wait for this before making DB queries
+  const [sessionReady, setSessionReady] = useState(false);
 
   const fetchProfileRef = useRef(async (userId: string) => {
-
     try {
-
-      // getUserProfile already has retry logic built in
-
       const userProfile = await getUserProfile(userId);
-
       if (userProfile) {
-
         setProfile(userProfile);
-
       } else {
-
-        // Profile came back null — DB might still be waking up, retry once more after 3s
-
+        // Profile came back null — DB might still be waking up, retry after 3s
         console.warn('[auth] Profile was null, retrying in 3s...');
-
         setTimeout(async () => {
-
           const retryProfile = await getUserProfile(userId);
-
           if (retryProfile) setProfile(retryProfile);
-
         }, 3000);
-
       }
-
     } catch (err) {
-
       console.error('[auth] Failed to fetch profile:', err);
-
     }
-
   });
 
-
-
   const refreshProfile = useCallback(async () => {
-
     if (user?.id) { await fetchProfileRef.current(user.id); }
-
   }, [user?.id]);
 
-
-
   const handleSignOut = useCallback(async () => {
-
     try {
-
       setUser(null);
-
       setProfile(null);
-
       setSession(null);
-
+      setSessionReady(false);
       const { error } = await supabase.auth.signOut();
-
       if (error) {
-
         console.error('Sign out error:', error);
-
         return { error: new Error(error.message) };
-
       }
-
       return { error: null };
-
     } catch (err) {
-
       console.error('Unexpected sign out error:', err);
-
       return { error: err instanceof Error ? err : new Error('Failed to sign out') };
-
     }
-
   }, []);
 
-
-
   useEffect(() => {
-
     let cancelled = false;
 
-    if (cached.current?.user) {
-
-      fetchProfileRef.current(cached.current.user.id);
-
-    }
+    // DON'T fetch profile from cached session — the token might be expired.
+    // Wait for onAuthStateChange to confirm/refresh the session first.
 
     const timeout = setTimeout(() => {
-
-      if (!cancelled) setIsLoading(false);
-
+      if (!cancelled) {
+        setIsLoading(false);
+        setSessionReady(true); // Safety timeout — assume ready after 3s
+      }
     }, 3000);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
-
       if (cancelled) return;
-
       clearTimeout(timeout);
-
       setSession(newSession);
-
       setUser(newSession?.user ?? null);
+      setSessionReady(true); // Token is now verified/refreshed
 
       if (newSession?.user) {
-
+        // NOW it's safe to fetch profile — we have a valid token
         fetchProfileRef.current(newSession.user.id);
-
       } else {
-
         setProfile(null);
-
       }
-
       setIsLoading(false);
-
     });
 
     return () => {
-
       cancelled = true;
-
       clearTimeout(timeout);
-
       subscription.unsubscribe();
-
     };
-
   }, []);
 
-
-
   const value: AuthContextType = {
-
-    user, profile, session, isLoading,
-
+    user, profile, session, isLoading, sessionReady,
     isAuthenticated: !!user,
-
     refreshProfile,
-
     signOut: handleSignOut,
-
   };
 
-
-
   return (
-
     <AuthContext.Provider value={value}>
-
       {children}
-
     </AuthContext.Provider>
-
   );
-
 }
-
-
 
 export function useAuth(): AuthContextType {
-
   const context = useContext(AuthContext);
-
   if (context === undefined) {
-
     throw new Error('useAuth must be used within an AuthProvider');
-
   }
-
   return context;
-
 }
-
