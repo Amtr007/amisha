@@ -32,7 +32,13 @@ export function ChatList({ selectedConversationId, onSelectConversation }: ChatL
   const loadConversations = useCallback(async () => {
     if (!user?.id) return;
     try {
-      const convs = await getConversations(user.id);
+      // 5s timeout so the chat list never shows a spinner forever
+      const convs = await Promise.race([
+        getConversations(user.id),
+        new Promise<ConversationWithDetails[]>((resolve) =>
+          setTimeout(() => resolve([]), 5000)
+        ),
+      ]);
       setConversations(convs);
     } catch (err) {
       console.error('[chat] Failed to load conversations:', err);
@@ -40,6 +46,7 @@ export function ChatList({ selectedConversationId, onSelectConversation }: ChatL
       setIsLoading(false);
     }
   }, [user?.id]);
+
 
   useEffect(() => {
     loadConversations();
