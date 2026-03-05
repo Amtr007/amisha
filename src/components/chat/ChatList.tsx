@@ -20,7 +20,7 @@ interface ChatListProps {
 }
 
 export function ChatList({ selectedConversationId, onSelectConversation }: ChatListProps) {
-  const { user } = useAuth();
+  const { user, sessionReady } = useAuth();
   const [conversations, setConversations] = useState<ConversationWithDetails[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<User[]>([]);
@@ -30,7 +30,8 @@ export function ChatList({ selectedConversationId, onSelectConversation }: ChatL
   const [isLoading, setIsLoading] = useState(true);
 
   const loadConversations = useCallback(async () => {
-    if (!user?.id) return;
+    // Wait for session to be verified — don't fetch with a stale/expired token
+    if (!user?.id || !sessionReady) return;
     try {
       // 5s timeout so the chat list never shows a spinner forever
       const convs = await Promise.race([
@@ -45,7 +46,7 @@ export function ChatList({ selectedConversationId, onSelectConversation }: ChatL
     } finally {
       setIsLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, sessionReady]);
 
 
   useEffect(() => {
