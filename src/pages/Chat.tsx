@@ -39,20 +39,19 @@ export function Chat() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  useEffect
-        const updateLastSeen = () => {
-                // Fire-and-forget, but properly handle the promise
-                // Wrap in Promise.resolve() because supabase.rpc returns PromiseLike
-                Promise.resolve(supabase.rpc('update_last_seen')).catch((err: unknown) => {
-                          console.warn('[chat] Failed to update last seen:', err);
-                });
-        };
+  useEffect(() => {
+    const updateLastSeen = () => {
+      // Fire-and-forget, but properly handle the promise
+      Promise.resolve(supabase.rpc('update_last_seen')).catch((err: unknown) => {
+        console.warn('[chat] Failed to update last seen:', err);
+      });
+    };
 
-        updateLastSeen();
-        // Update every 30s for more responsive "last seen" status
-        const interval = setInterval(updateLastSeen, 30000);
+    updateLastSeen();
+    // Update every 30s for more responsive "last seen" status
+    const interval = setInterval(updateLastSeen, 30000);
 
-        return () => clearInterval(interval);
+    return () => clearInterval(interval);
   }, []);
 
   const handleSelectConversation = (conversation: ConversationWithDetails) => {
